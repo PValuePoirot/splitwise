@@ -1,0 +1,44 @@
+# Render Blueprint for Splitwise deployment.
+# Docs: https://render.com/docs/blueprint-spec
+# After pushing this to GitHub, go to Render → New → Blueprint and select this repo.
+
+services:
+  # ---- Backend API (FastAPI) ----
+  - type: web
+    name: splitwise-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false # set in Render dashboard (Neon connection string)
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong random secret
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false # set to the frontend static-site URL once it exists
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+    autoDeploy: true
+
+  # ---- Frontend (React static site) ----
+  - type: web
+    name: splitwise-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    envVars:
+      - key: VITE_API_URL
+        sync: false # set to the backend service URL (https://splitwise-api.onrender.com)
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    autoDeploy: true
